@@ -31,8 +31,8 @@ class datamsg {
 public:
     MESSAGE_TYPE mtype;
     int person;
-    double seconds;
-    int ecgno;
+    double seconds; // + 1st column of csv files
+    int ecgno; // + 2nd or 3rd column of csv (2nd is ECG1, 3rd is ECG2)
 
     datamsg (int _person, double _seconds, int _eno) {
         mtype = DATA_MSG;
