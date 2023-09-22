@@ -15,11 +15,12 @@
 
 #include <vector>
 #include <string>
+#include <fstream>
 
 using namespace std;
 
 /**
- * @brief because there wasn't a library way to do this
+ * @brief because there wasn't a (safe) library way to do this
  * 
  * @param src C string to copy from
  * @param dst empty C string to copy to
@@ -139,13 +140,12 @@ int main (int argc, char *argv[]) {
 	
 	// {} END Section D
 	
-	if ((p != -1) && (t != -1.0) && (e != -1)) {
+	if ((p != -1) && (t != -1.0) && (e != -1)) { // only want to run Section A if args (p, t, e) have all been specified
 		// {} Section A: Single Point Function
-		// * this 
-		// * only want to run Section A if args (p, t, e) have all been specified
+		// [] Currently passes basic testing
 		// example data point request
 		char buf[MAX_MESSAGE]; // 256
-		datamsg x(1, 0.0, 1); //TODO replace hardcoded args with (p, t, e)
+		datamsg x(p, t, e);
 		
 		// -- Copy message into buffer
 		memcpy(buf, &x, sizeof(datamsg));
@@ -157,15 +157,50 @@ int main (int argc, char *argv[]) {
 		cout << "For person " << p << ", at time " << t << ", the value of ecg " << e << " is " << reply << endl;
 		// {} END Section A
 	}
-	else if (p != -1) {
+	else if (p != -1) { // else, if (p) is specified, request 1000 lines of code
 		// {} Section B: Many Lines Function
-		// * else, if (p) is specified, request 1000 lines of code
+		fstream outfile;
+		char outfilename[] = "received/xN.csv"; outfilename[10] = (char)(p + '0');
+		fstream file(outfilename);
+		outfile.open(outfilename, fstream::out);
+		
+		// + example line from 1.csv: `0,0.635,-0.64`
+		
+		double time = 0; // time in increments of 0.004
+		
+		char buf[MAX_MESSAGE]; // 256
+		datamsg x(p, 0, 1);
+		double reply;
+		
 		// need to loop over first 1000 lines
-		// send request for ECG1
-		// send request for ECG2
-		// write line to recieved/x1.csv
-		// (functionally the same as 2000 individual requests plus a file write)
-		// can open file however we chose (fstream, file, fopen, etc.), just have to make sure result is identical to original
+		for (int i = 0; i < 1000; ++i) {
+			outfile << time << ",";
+			
+			// send request for ECG1
+			x.seconds = time;
+			x.ecgno = 1;
+			memcpy(buf, &x, sizeof(datamsg)); // -- Copy message into buffer
+			chan.cwrite(buf, sizeof(datamsg)); // question  // -- Send buffer to channel
+			chan.cread(&reply, sizeof(double)); //answer // -- reply (the ECG value) returned as a double
+			
+			outfile << reply << ",";
+			
+			// send request for ECG2
+			x.seconds = time;
+			x.ecgno = 2;
+			memcpy(buf, &x, sizeof(datamsg)); // -- Copy message into buffer
+			chan.cwrite(buf, sizeof(datamsg)); // question  // -- Send buffer to channel
+			chan.cread(&reply, sizeof(double)); //answer // -- reply (the ECG value) returned as a double
+			
+			outfile << reply << "\n";
+			
+			// write line to recieved/x1.csv
+			// (functionally the same as 2000 individual requests plus a file write)
+			// can open file however we chose (fstream, file, fopen, etc.), just have to make sure result is identical to original
+			time += 0.004;
+		}
+		
+		outfile.close();
 		// {} END Section B
 	}
 	else if (filename != "") {
