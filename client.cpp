@@ -86,30 +86,32 @@ int main (int argc, char *argv[]) {
 		// In child, run execvp using the server arguments
 		// Lab 1a/b have info on how to run exec in a child
 		/*
-		Upon successful completion, fork() shall return 0 to the child process and shall return the process ID of the child process to the parent process. Both processes shall continue to execute from the fork() function. Otherwise, -1 shall be returned to the parent process, no child process shall be created, and errno shall be set to indicate the error.
+		Upon successful completion, fork() shall return 0 to the child process and shall return the process ID of the child process to the parent process.
+		Both processes shall continue to execute from the fork() function. Otherwise, -1 shall be returned to the parent process, no child process shall be created, and errno shall be set to indicate the error.
 		from `https://pubs.opengroup.org/onlinepubs/9699919799/functions/fork.html`
 		*/
 		int pid = fork();
 		
-		//! NEED TO USE PID/PPID to ensure that only child `exec`'s
-		// use int m to set second argument (how?)
-		string m_val_string = to_string(m);
-		const char * m_val_const = m_val_string.c_str();
-		char * m_val = nullptr;
-		c_str_copy(m_val_const, m_val, m_val_string.size()+1);
-		cout << "m_val: `" << m_val << "`\n"; //Test print//
-		
-		// code template from lab demo
-		char path[] = "./server";
-		char flag[] = "-m";
-		char* args[] = {path, flag, m_val, NULL}; //"arg1", "arg2", // (char*) 
-		int ret = execvp(args[0], args);
-		if (ret == -1) {
-			perror("execvp");
-			exit(EXIT_FAILURE);
+		if (pid == 0) { // if we're in the child
+			// use int m to set second argument (how?)
+			string m_val_string = to_string(m);
+			const char * m_val_const = m_val_string.c_str();
+			char * m_val = nullptr;
+			c_str_copy(m_val_const, m_val, m_val_string.size()+1);
+			cout << "m_val: `" << m_val << "`\n"; //Test print//
+			
+			// code template from lab demo
+			char path[] = "./server";
+			char flag[] = "-m";
+			char* args[] = {path, flag, m_val, NULL}; //"arg1", "arg2", // (char*) 
+			int ret = execvp(args[0], args);
+			if (ret == -1) {
+				perror("execvp");
+				exit(EXIT_FAILURE);
+			}
+			
+			delete[] m_val; // delete memory allocated in c_str_copy
 		}
-		
-		delete[] m_val; // delete memory allocated in c_str_copy
 	}
 	// {} END Section 0
 	
