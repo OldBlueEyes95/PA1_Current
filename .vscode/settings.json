@@ -1,0 +1,14 @@
+{
+    "makefile.launchConfigurations": [
+        {
+            "cwd": "/mnt/c/Users/Noah/Documents/GitHub/PA1_Current",
+            "binaryPath": "/mnt/c/Users/Noah/Documents/GitHub/PA1_Current/client",
+            "binaryArgs": []
+        },
+        {
+            "cwd": "/home/vboxuser/Documents/CSCE313_PA1",
+            "binaryPath": "/home/vboxuser/Documents/CSCE313_PA1/client",
+            "binaryArgs": []
+        }
+    ]
+}

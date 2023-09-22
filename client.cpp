@@ -14,22 +14,42 @@
 #include "FIFORequestChannel.h"
 
 #include <vector>
-// #include <string> // only for use in new channel function (Section D)
+#include <string>
 
 using namespace std;
 
+/**
+ * @brief because there wasn't a library way to do this
+ * 
+ * @param src C string to copy from
+ * @param dst empty C string to copy to
+ * @param size size of src and later dst
+ */
+void c_str_copy(const char * src, char * dst, int size) {
+	if (dst != nullptr) {
+		cout << "Copy failed, dst was not empty.\n";
+	}
+	else {
+		dst = new char[size];
+		int i;
+		for (i = 0; i < size; ++i) {
+			dst[i] = src[i];
+		}
+	}
+}
+
 
 int main (int argc, char *argv[]) {
+	cout << "Starting up client main...\n"; //Test print//
+	
 	int opt;
-	// * tutorial: default to -1 (invalid) to determine if fields have been modified
-	int p = -1;
+	// CL arguments
+	bool new_chan = false; // * tutorial
+	int p = -1; // * tutorial: default to -1 (invalid) to determine if fields have been modified
 	double t = -1.0;
 	int e = -1;
-	vector<FIFORequestChannel *> channels; // for New Channel Function
-	
-	bool new_chan = false; // * tutorial
-	
 	int m = MAX_MESSAGE; // * added from tutorial vid
+	vector<FIFORequestChannel *> channels; channels.reserve(2); // for New Channel Function
 	
 	// -- parses command line arguments into usable C types
 	string filename = "";
@@ -65,18 +85,35 @@ int main (int argc, char *argv[]) {
 		// do fork
 		// In child, run execvp using the server arguments
 		// Lab 1a/b have info on how to run exec in a child
+		/*
+		Upon successful completion, fork() shall return 0 to the child process and shall return the process ID of the child process to the parent process. Both processes shall continue to execute from the fork() function. Otherwise, -1 shall be returned to the parent process, no child process shall be created, and errno shall be set to indicate the error.
+		from `https://pubs.opengroup.org/onlinepubs/9699919799/functions/fork.html`
+		*/
+		int pid = fork();
 		
-		// TODO use int m to set second argument (how?)
+		//! NEED TO USE PID/PPID to ensure that only child `exec`'s
+		// use int m to set second argument (how?)
+		string m_val_string = to_string(m);
+		const char * m_val_const = m_val_string.c_str();
+		char * m_val = nullptr;
+		c_str_copy(m_val_const, m_val, m_val_string.size()+1);
+		cout << "m_val: `" << m_val << "`\n"; //Test print//
+		
 		// code template from lab demo
-		char* args[] = {(char*) "./server", "-m", "not sure what this is", NULL}; //"arg1", "arg2",
+		char path[] = "./server";
+		char flag[] = "-m";
+		char* args[] = {path, flag, m_val, NULL}; //"arg1", "arg2", // (char*) 
 		int ret = execvp(args[0], args);
 		if (ret == -1) {
 			perror("execvp");
 			exit(EXIT_FAILURE);
 		}
+		
+		delete[] m_val; // delete memory allocated in c_str_copy
 	}
 	// {} END Section 0
-
+	
+	//? I don't know the internals of the Channel, so this might have to go before Server is run from Client (Section 0) instead of after
     FIFORequestChannel default_chan("control", FIFORequestChannel::CLIENT_SIDE); // -- this is the control channel, as managed by the FIFOR.C. object
 	channels.push_back(&default_chan); // add control channel to list of valid channels
 	
@@ -100,81 +137,95 @@ int main (int argc, char *argv[]) {
 	
 	// {} END Section D
 	
-	// {} Section A: Single Point Function
-	// * this 
-	// * only want to run Section A if args (p, t, e) have all been specified
-	// example data point request
-    char buf[MAX_MESSAGE]; // 256
-    datamsg x(1, 0.0, 1); //TODO replace hardcoded args with (p, t, e)
-	
-	// -- Copy message into buffer
-	memcpy(buf, &x, sizeof(datamsg));
-	// -- Send buffer to channel
-	chan.cwrite(buf, sizeof(datamsg)); // question
-	double reply;
-	// -- reply (the ECG value) returned as a double
-	chan.cread(&reply, sizeof(double)); //answer
-	cout << "For person " << p << ", at time " << t << ", the value of ecg " << e << " is " << reply << endl;
-	// {} END Section A
-	
-	
-	// {} Section B: Many Lines Function
-	// * else, if (p) is specified, request 1000 lines of code
-	// need to loop over first 1000 lines
-	// send request for ECG1
-	// send request for ECG2
-	// write line to recieved/x1.csv
-	// (functionally the same as 2000 individual requests plus a file write)
-	// can open file however we chose (fstream, file, fopen, etc.), just have to make sure result is identical to original
-	// {} END Section B
-	
-	
-	// {} Section C Arbitrary File Function
-    // sending a non-sense message, you need to change this
-	filemsg fm(0, 0); // -- (0,0) is a request for a file size
-	string fname = "teslkansdlkjflasjdf.dat"; // * this has been hardcoded, will replace with option recieved from getopt loop
-	
-	// --     message specifier + filename + null terminator
-	int len = sizeof(filemsg) + (fname.size() + 1);
-	char* buf2 = new char[len];
-	memcpy(buf2, &fm, sizeof(filemsg));
-	strcpy(buf2 + sizeof(filemsg), fname.c_str());
-	// -- this message requests the file length from the server
-	chan.cwrite(buf2, len);  // I want the file length;
-	
-	// * new code from tutorial
-	int64_t filesize = 0; // to read the file length into
-	chan.cread(&filesize, sizeof(int64_t));
-	cout << "File length is: " << filesize << " bytes\n"; // attempted to copy output message // TODO hopefully they didn't use endl
-	
-	char * buf3 = nullptr; // -- response buffer
-	// TODO set size to buff capacity (aka m)
-	
-	
-	// loop over the segments in the file in chunks of filesize/m (m === buff_capcity)
-	// create filemsg instance (can reuse buf2)
-	filemsg * file_req = (filemsg *) buf2; // pointer cast is safe since buf2 originally held a filemsg
-	file_req->offset = NULL; // TODO set offset in the file
-	file_req->length = NULL; // TODO set length of segment, be careful to use min of segment len and len of file remaining
-	// send the request (buf2)
-	chan.cwrite(buf2, len);  // reuse this line from earlier
-	// receive the response
-	// cread into buf3 (length file_req = len (same length as specified in `file_req->length =`))	
-	// write buf3 into file: received/filename
+	if ((p != -1) && (t != -1.0) && (e != -1)) {
+		// {} Section A: Single Point Function
+		// * this 
+		// * only want to run Section A if args (p, t, e) have all been specified
+		// example data point request
+		char buf[MAX_MESSAGE]; // 256
+		datamsg x(1, 0.0, 1); //TODO replace hardcoded args with (p, t, e)
+		
+		// -- Copy message into buffer
+		memcpy(buf, &x, sizeof(datamsg));
+		// -- Send buffer to channel
+		chan.cwrite(buf, sizeof(datamsg)); // question
+		double reply;
+		// -- reply (the ECG value) returned as a double
+		chan.cread(&reply, sizeof(double)); //answer
+		cout << "For person " << p << ", at time " << t << ", the value of ecg " << e << " is " << reply << endl;
+		// {} END Section A
+	}
+	else if (p != -1) {
+		// {} Section B: Many Lines Function
+		// * else, if (p) is specified, request 1000 lines of code
+		// need to loop over first 1000 lines
+		// send request for ECG1
+		// send request for ECG2
+		// write line to recieved/x1.csv
+		// (functionally the same as 2000 individual requests plus a file write)
+		// can open file however we chose (fstream, file, fopen, etc.), just have to make sure result is identical to original
+		// {} END Section B
+	}
+	else if (filename != "") {
+		// {} Section C Arbitrary File Function
+		// sending a non-sense message, you need to change this
+		filemsg fm(0, 0); // -- (0,0) is a request for a file size
+		string fname = "teslkansdlkjflasjdf.dat"; // * this has been hardcoded, will replace with option recieved from getopt loop
+		
+		// --     message specifier + filename + null terminator
+		int len = sizeof(filemsg) + (fname.size() + 1);
+		char* buf2 = new char[len];
+		memcpy(buf2, &fm, sizeof(filemsg));
+		strcpy(buf2 + sizeof(filemsg), fname.c_str());
+		// -- this message requests the file length from the server
+		chan.cwrite(buf2, len);  // I want the file length;
+		
+		// * new code from tutorial
+		int64_t filesize = 0; // to read the file length into
+		chan.cread(&filesize, sizeof(int64_t));
+		cout << "File length is: " << filesize << " bytes\n"; // attempted to copy output message // TODO hopefully they didn't use endl
+		
+		char * buf3 = nullptr; // -- response buffer
+		// TODO set size to buff capacity (aka m)
+		
+		
+		// loop over the segments in the file in chunks of filesize/m (m === buff_capcity)
+		// create filemsg instance (can reuse buf2)
+		filemsg * file_req = (filemsg *) buf2; // pointer cast is safe since buf2 originally held a filemsg
+		file_req->offset = -1; // TODO set offset in the file
+		file_req->length = -1; // TODO set length of segment, be careful to use min of segment len and len of file remaining
+		// send the request (buf2)
+		chan.cwrite(buf2, len);  // reuse this line from earlier
+		// receive the response
+		// cread into buf3 (length file_req = len (same length as specified in `file_req->length =`))	
+		// write buf3 into file: received/filename
 
-	delete[] buf2;
-	delete[] buf3;
+		delete[] buf2;
+		delete[] buf3;
+		
+		// {} END Section C
+	}
+	else {
+		cout 
+			<< "Valid flags not set; flags were: " 
+			<< "p: `" << p << "`, "
+			<< "t: `" << t << "`, "
+			<< "e: `" << e << "`, "
+			<< "filename: `" << filename << "`, "
+			<< "m: `" << m << "`, "
+			<< "new_chan: `" << new_chan << "`.\n";
+	}
 	
-	// {} END Section C
 	
+	// delete any new channels
+	if (channels.size() > 1) {
+		for (unsigned int i = 1; i < channels.size(); ++i) {
+			delete channels.at(i);
+		}
+	}
 	
-	// TODO if necessary delete new channels
-	/*
-	for chan in channels (except the first one):
-		delete the channel
-	*/
 	
 	// closing the channel    
-    MESSAGE_TYPE m = QUIT_MSG;
-    chan.cwrite(&m, sizeof(MESSAGE_TYPE));
+    MESSAGE_TYPE qm = QUIT_MSG;
+    chan.cwrite(&qm, sizeof(MESSAGE_TYPE));
 }
