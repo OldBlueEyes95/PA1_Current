@@ -49,7 +49,7 @@ public:
     MESSAGE_TYPE mtype;
     __int64_t offset;
     int length;
-	    
+	
     filemsg (__int64_t _offset, int _length) {
         mtype = FILE_MSG;
         offset = _offset;

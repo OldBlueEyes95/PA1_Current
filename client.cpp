@@ -41,7 +41,7 @@ void c_str_copy(const char * src, char * dst, int size) {
 
 
 int main (int argc, char *argv[]) {
-	cout << "Starting up client main...\n"; //Test print//
+	// cout << "Starting up client main...\n"; //Test print//
 	
 	int opt;
 	// CL arguments
@@ -54,6 +54,7 @@ int main (int argc, char *argv[]) {
 	
 	// -- parses command line arguments into usable C types
 	string filename = "";
+	string m_opt = "";
 	// -- colon after arg means arg has a value; c is boolean, so no value needed
 	while ((opt = getopt(argc, argv, "p:t:e:f:m:c")) != -1) { // * changed b/c tutorial
 		switch (opt) {
@@ -70,6 +71,8 @@ int main (int argc, char *argv[]) {
 				filename = optarg;
 				break;
 			case 'm': // -- buffer cap (specifies how many bytes (char) can be sent to/from server/client; aka determines how many chunks to split file into)
+				m_opt = optarg;
+				cout << "m_opt: `" << m_opt << "`.\n"; //Test print//
 				m = atoi(optarg); // * tutorial
 				break;
 			case 'c': // -- new channel requested
@@ -94,24 +97,68 @@ int main (int argc, char *argv[]) {
 		int pid = fork();
 		
 		if (pid == 0) { // if we're in the child
+			/*
+			// + idea: extract and reuse original -m straight from argv
+			char * shared_buf = nullptr; // keep default
+			char ** mystery_arg = argv;
+			for (int i = 0; mystery_arg[i] != NULL; i++) {
+				if (
+					(*mystery_arg[0] != '\0') ||
+					(false)
+				) {
+					continue;
+				}
+				
+				cout << "*mystery_arg[0]: `" << *mystery_arg[0] << "`.\n"; //Test print//
+				
+				if (*(mystery_arg)[1] == 'm') {
+					shared_buf = *mystery_arg;
+					break;
+				}
+			}
+			
+			// char * def_flag = {'-', 'm', ' ', '2', '5', '6', '\0'}; // "-m 256";
+			char def_flag[] = "-m 256";
+			if (shared_buf == nullptr) {
+				cout << "Buffer unspecified.\n"; //Test print//
+				shared_buf = def_flag;
+			}
+			*/
+			
+			/* //+ old way of doing things
 			// use int m to set second argument (how?)
-			string m_val_string = to_string(m);
+			string m_val_string = m_opt; // to_string(m);
+			m_val_string = string("-m ") + m_opt;
 			const char * m_val_const = m_val_string.c_str();
 			char * m_val = nullptr;
 			c_str_copy(m_val_const, m_val, m_val_string.size()+1);
 			cout << "m_val: `" << m_val << "`\n"; //Test print//
+			*/
 			
 			// code template from lab demo
 			char path[] = "./server";
-			char flag[] = "-m";
-			char* args[] = {path, flag, m_val, NULL}; //"arg1", "arg2", // (char*) 
+			char flag[] = "-m 2560372036854775807"; // aka max value of long, which gives a cap on how many digits we need
+			if (m_opt.size() > 0) {
+				unsigned int i;
+				for (i = 0; i < m_opt.size(); ++i) {
+					flag[i + 3] = m_opt.at(i); // overwrite default
+				}
+				flag[i + 3] = '\0'; // a sneaky trick
+			}
+			else {
+				flag[6] = '\0';
+			}
+			cout << "flag: `" << flag << "`.\n"; //Test print//
+
+			// char flag[] = "-m";
+			char* args[] = {path, flag, NULL}; // flag //"arg1", "arg2", // (char*)
 			int ret = execvp(args[0], args);
 			if (ret == -1) {
 				perror("execvp");
 				exit(EXIT_FAILURE);
 			}
 			
-			delete[] m_val; // delete memory allocated in c_str_copy
+			// delete[] m_val; // delete memory allocated in c_str_copy
 		}
 	}
 	// {} END Section 0
@@ -124,13 +171,14 @@ int main (int argc, char *argv[]) {
 	// * from tutorial
 	if (new_chan) {
 		// send new channel request to server (step 1 of diagram)
-		MESSAGE_TYPE nc = NEWCHANNEL_MSG;
-        default_chan.cwrite(&nc, sizeof(MESSAGE_TYPE)); // copied from quit at bottom
+		cout << "Will add this later.\n"; //Test print//
+		// MESSAGE_TYPE nc = NEWCHANNEL_MSG;
+        // default_chan.cwrite(&nc, sizeof(MESSAGE_TYPE)); // copied from quit at bottom
 		// step 2 of diagram
 		// create variable to hold the name (can use `char *` or `string`)
 		// cread the response from the server
 		// call the FIFORequestChannel constructor with the name from the server (make sure to call new so that channel persists outside of if block scope)
-		// ! I can see a potential issue: having them on the heap means memory to clean up, but the first channel isn't on the heap; need to ensure no memory leaks and currently memory from the channels vector is not cleaned up
+		
 		// step 3 of diagram
 		// two ways: copy and paste the bottom into here OR create a structure to hold channels (array or vec)
 		// push new channel into vector of channels
@@ -151,7 +199,7 @@ int main (int argc, char *argv[]) {
 		memcpy(buf, &x, sizeof(datamsg));
 		// -- Send buffer to channel
 		chan.cwrite(buf, sizeof(datamsg)); // question
-		double reply;
+		double reply = 404.404; // obvious value
 		// -- reply (the ECG value) returned as a double
 		chan.cread(&reply, sizeof(double)); //answer
 		cout << "For person " << p << ", at time " << t << ", the value of ecg " << e << " is " << reply << endl;
@@ -160,7 +208,7 @@ int main (int argc, char *argv[]) {
 	else if (p != -1) { // else, if (p) is specified, request 1000 lines of code
 		// {} Section B: Many Lines Function
 		fstream outfile;
-		char outfilename[] = "received/xN.csv"; outfilename[10] = (char)(p + '0');
+		char outfilename[] = "received/x1.csv"; // outfilename[10] = (char)(p + '0');
 		fstream file(outfilename);
 		outfile.open(outfilename, fstream::out);
 		
@@ -207,11 +255,18 @@ int main (int argc, char *argv[]) {
 		// {} Section C Arbitrary File Function
 		// sending a non-sense message, you need to change this
 		filemsg fm(0, 0); // -- (0,0) is a request for a file size
-		string fname = "teslkansdlkjflasjdf.dat"; // * this has been hardcoded, will replace with option recieved from getopt loop
+		string fname = filename; // "teslkansdlkjflasjdf.dat"; // this has been hardcoded, will replace with option recieved from getopt loop
+		
+		
+		fstream outfile;
+		// char outfilename[] = "received/x1.csv"; // outfilename[10] = (char)(p + '0');
+		fstream file(fname);
+		outfile.open(fname, fstream::out); // string("received/") + 
+		
 		
 		// --     message specifier + filename + null terminator
 		int len = sizeof(filemsg) + (fname.size() + 1);
-		char* buf2 = new char[len];
+		char * buf2 = new char[len];
 		memcpy(buf2, &fm, sizeof(filemsg));
 		strcpy(buf2 + sizeof(filemsg), fname.c_str());
 		// -- this message requests the file length from the server
@@ -219,26 +274,39 @@ int main (int argc, char *argv[]) {
 		
 		// * new code from tutorial
 		int64_t filesize = 0; // to read the file length into
+		int64_t bytes_left = 0;
 		chan.cread(&filesize, sizeof(int64_t));
 		cout << "File length is: " << filesize << " bytes\n"; // attempted to copy output message // TODO hopefully they didn't use endl
+		bytes_left = filesize;
 		
-		char * buf3 = nullptr; // -- response buffer
-		// TODO set size to buff capacity (aka m)
+		char * buf3 = new char[m]; // -- response buffer //? TODO set size to buff capacity (aka m)
 		
-		
-		// loop over the segments in the file in chunks of filesize/m (m === buff_capcity)
 		// create filemsg instance (can reuse buf2)
 		filemsg * file_req = (filemsg *) buf2; // pointer cast is safe since buf2 originally held a filemsg
-		file_req->offset = -1; // TODO set offset in the file
-		file_req->length = -1; // TODO set length of segment, be careful to use min of segment len and len of file remaining
-		// send the request (buf2)
-		chan.cwrite(buf2, len);  // reuse this line from earlier
-		// receive the response
-		// cread into buf3 (length file_req = len (same length as specified in `file_req->length =`))	
-		// write buf3 into file: received/filename
-
+		// loop over the segments in the file in chunks of filesize/m (m === buff_capcity)
+		for (int i = 0; bytes_left > 0; i += m) {
+			file_req->offset = i; // set offset in the file
+			file_req->length = (bytes_left < m) ? bytes_left : m; // set length of segment, be careful to use min of segment len and len of file remaining
+			bytes_left -= m;
+			// send the request (buf2)
+			chan.cwrite(buf2, len);  // reuse this line from earlier
+			// receive the response
+			chan.cread(buf3, file_req->length); // cread into buf3 (length file_req = len (same length as specified in `file_req->length =`))	
+			
+			// write buf3 into file: received/filename
+			for (int j = 0; j < file_req->length; ++j) {
+				outfile << buf3[j];
+			}
+		}
+		
 		delete[] buf2;
 		delete[] buf3;
+		
+		outfile.close();
+
+		// move file from outer directory to received
+		// this isn't ideal, but I'm not risking changing my working code
+		rename(fname.c_str(), (string("received/") + fname).c_str());
 		
 		// {} END Section C
 	}
@@ -265,4 +333,6 @@ int main (int argc, char *argv[]) {
 	// closing the channel    
     MESSAGE_TYPE qm = QUIT_MSG;
     chan.cwrite(&qm, sizeof(MESSAGE_TYPE));
+
+	return 0; //? why wasn't this here originally?
 }
