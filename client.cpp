@@ -72,7 +72,7 @@ int main (int argc, char *argv[]) {
 				break;
 			case 'm': // -- buffer cap (specifies how many bytes (char) can be sent to/from server/client; aka determines how many chunks to split file into)
 				m_opt = optarg;
-				cout << "m_opt: `" << m_opt << "`.\n"; //Test print//
+				// cout << "m_opt: `" << m_opt << "`.\n"; //Test print//
 				m = atoi(optarg); // * tutorial
 				break;
 			case 'c': // -- new channel requested
@@ -83,82 +83,38 @@ int main (int argc, char *argv[]) {
 	
 	// {} Section 0: Run Server from Client
 	{
-		// + stuff from tutorial video
-		// give arguments for the server
-		// server needs './server', '-m', '<val for -m arg>', 'NULL'
-		// do fork
-		// In child, run execvp using the server arguments
-		// Lab 1a/b have info on how to run exec in a child
 		/*
 		Upon successful completion, fork() shall return 0 to the child process and shall return the process ID of the child process to the parent process.
 		Both processes shall continue to execute from the fork() function. Otherwise, -1 shall be returned to the parent process, no child process shall be created, and errno shall be set to indicate the error.
 		from `https://pubs.opengroup.org/onlinepubs/9699919799/functions/fork.html`
 		*/
+		// do fork
 		int pid = fork();
 		
+		// In child, run execvp using the server arguments
 		if (pid == 0) { // if we're in the child
-			/*
-			// + idea: extract and reuse original -m straight from argv
-			char * shared_buf = nullptr; // keep default
-			char ** mystery_arg = argv;
-			for (int i = 0; mystery_arg[i] != NULL; i++) {
-				if (
-					(*mystery_arg[0] != '\0') ||
-					(false)
-				) {
-					continue;
-				}
-				
-				cout << "*mystery_arg[0]: `" << *mystery_arg[0] << "`.\n"; //Test print//
-				
-				if (*(mystery_arg)[1] == 'm') {
-					shared_buf = *mystery_arg;
-					break;
-				}
-			}
-			
-			// char * def_flag = {'-', 'm', ' ', '2', '5', '6', '\0'}; // "-m 256";
-			char def_flag[] = "-m 256";
-			if (shared_buf == nullptr) {
-				cout << "Buffer unspecified.\n"; //Test print//
-				shared_buf = def_flag;
-			}
-			*/
-			
-			/* //+ old way of doing things
-			// use int m to set second argument (how?)
-			string m_val_string = m_opt; // to_string(m);
-			m_val_string = string("-m ") + m_opt;
-			const char * m_val_const = m_val_string.c_str();
-			char * m_val = nullptr;
-			c_str_copy(m_val_const, m_val, m_val_string.size()+1);
-			cout << "m_val: `" << m_val << "`\n"; //Test print//
-			*/
-			
 			// code template from lab demo
 			char path[] = "./server";
-			char flag[] = "-m 2560372036854775807"; // aka max value of long, which gives a cap on how many digits we need
+			char flag[] = "-m 2560372036854775807"; // same len as max value of long, which gives a cap on how many digits we need
 			if (m_opt.size() > 0) {
 				unsigned int i;
 				for (i = 0; i < m_opt.size(); ++i) {
 					flag[i + 3] = m_opt.at(i); // overwrite default
 				}
-				flag[i + 3] = '\0'; // a sneaky trick
+				flag[i + 3] = '\0'; // a sneaky trick to make the function ignore the rest of the C string
 			}
 			else {
 				flag[6] = '\0';
 			}
-			cout << "flag: `" << flag << "`.\n"; //Test print//
-
-			// char flag[] = "-m";
-			char* args[] = {path, flag, NULL}; // flag //"arg1", "arg2", // (char*)
+			// cout << "flag: `" << flag << "`.\n"; //Test print//
+			
+			// server needs './server', '-m <val for -m arg>', 'NULL'
+			char* args[] = {path, flag, NULL};
 			int ret = execvp(args[0], args);
 			if (ret == -1) {
 				perror("execvp");
 				exit(EXIT_FAILURE);
 			}
-			
-			// delete[] m_val; // delete memory allocated in c_str_copy
 		}
 	}
 	// {} END Section 0
@@ -172,16 +128,21 @@ int main (int argc, char *argv[]) {
 	if (new_chan) {
 		// send new channel request to server (step 1 of diagram)
 		cout << "Will add this later.\n"; //Test print//
-		// MESSAGE_TYPE nc = NEWCHANNEL_MSG;
-        // default_chan.cwrite(&nc, sizeof(MESSAGE_TYPE)); // copied from quit at bottom
+		MESSAGE_TYPE nc = NEWCHANNEL_MSG;
+        default_chan.cwrite(&nc, sizeof(MESSAGE_TYPE)); // copied from quit at bottom
 		// step 2 of diagram
+		const int name_length = 100;
 		// create variable to hold the name (can use `char *` or `string`)
+		char response[name_length] = {}; // * not sure how long the name can be, so 100 characters of space to be safe
 		// cread the response from the server
+		default_chan.cread(response, name_length); // TODO pick up here
 		// call the FIFORequestChannel constructor with the name from the server (make sure to call new so that channel persists outside of if block scope)
+		FIFORequestChannel * second_chan = new FIFORequestChannel(response, FIFORequestChannel::CLIENT_SIDE);
 		
 		// step 3 of diagram
 		// two ways: copy and paste the bottom into here OR create a structure to hold channels (array or vec)
 		// push new channel into vector of channels
+		channels.push_back(second_chan);
 	}
 	
 	FIFORequestChannel chan = *(channels.back()); // ensure that most recent channel is used
@@ -190,7 +151,6 @@ int main (int argc, char *argv[]) {
 	
 	if ((p != -1) && (t != -1.0) && (e != -1)) { // only want to run Section A if args (p, t, e) have all been specified
 		// {} Section A: Single Point Function
-		// [] Currently passes basic testing
 		// example data point request
 		char buf[MAX_MESSAGE]; // 256
 		datamsg x(p, t, e);
