@@ -1,0 +1,20 @@
+# Time measurements
+
+Measurements made on a Ubuntu VM on my Windows laptop.
+
+Transfer of files went as following (chart included as minutes_per_byte.png)
+Bytes | Time (s)
+----- | ---
+1     | 0.63
+10    | 0.95
+100   | 0.58
+1k    | 0.50
+10k   | 0.78
+100k  | 0.86
+1m    | 4.73
+10m   | 13.52
+100m  | 1:14.86
+
+Times were trivial for low values, but this surprisingly persisted even up to a hundred thousand bytes (far past when a single buffer could be used). 
+Reads are usually cheaper than writes, so the file write (fstream was what I chose) is probably the bottleneck.
+Some quick research shows that an L1 cache is around 64KB and an L2 around 256KB, and given where the slowdown began it's possible that cache size may have played a factor.
